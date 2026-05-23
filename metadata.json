@@ -1,0 +1,6 @@
+{
+  "name": "Revize",
+  "description": "Transform uploaded textbooks, notes, and study PDFs into AI-narrated educational revision reels.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
