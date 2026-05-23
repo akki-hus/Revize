@@ -15,3 +15,13 @@ export interface GenerationResponse {
   slides: Slide[];
   error?: string;
 }
+
+export interface UserProfile {
+  name: string;
+  email: string;
+  standard: string; // "1" to "12"
+  board: string; // "CBSE" | "ICSE" | "State Board" | "IGCSE" | "IB" | "Other"
+  onboarded: boolean;
+  isGuest: boolean;
+  savedReelsCount: number;
+}

@@ -2,7 +2,7 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import multer from "multer";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
 import { PDFParse } from "pdf-parse";
 
@@ -63,27 +63,7 @@ app.get("/api/health", (req, res) => {
 async function generateRevisionSlides(textNotes: string, topicName: string = ""): Promise<{ topic: string; slides: any[] }> {
   const ai = getAI();
   const systemPrompt = `You are an expert masterclass educator who transforms complex topics, PDFs, or textbook notes into highly immersive, extremely engaging, and deep study revision reels.
-You are planning an extensive visual study slideshow of between 7 and 10 slides to make the revision video long, comprehensive, and high-value.
-
-Your output must be structurally clean and valid JSON.
-Format specifications:
-{
-  "topic": "Summarized beautiful topic name",
-  "slides": [
-    {
-      "title": "Clear, highly attractive slide title",
-      "bullets": [
-        "Concise, high-yield bullet point with key term bolded with markdown **bold** tags",
-        "Second high-yield bullet point with markdown bold for important terms"
-      ],
-      "narration": "A deep, energetic, fluid, and comprehensive audio narration script containing 4-6 full descriptive educational sentences (approximately 45-65 words). It should sound like a friendly, professional educator narrating a mini-podcast or masterclass documentary. Do not read the bullet points directly; instead, build context, analogies, and rich depth around them.",
-      "image_prompt": "A breathtaking, futuristic, dramatic, or cinematic concept art illustrative prompt representing the slide subject visually. IMPORTANT: To prevent rendering messy text-slop or gibberish words, DO NOT include any words like 'infographic', 'chart', 'diagram', 'text', 'labels', or 'numbers'. Do not request overlay text, labels, or interface elements. Instead, describe rich ambient scenes, professional lighting, photorealistic textures, or elegant symbolic visual metaphors in 16:9 widescreen layout.",
-      "duration": 20
-    }
-  ]
-}
-
-Only return raw JSON string. Do not wrap in markdown or any tags, just pure valid JSON. Must summarize effectively with 7 to 10 total slides.`;
+You must plan an extensive visual study slideshow of between 7 and 10 slides to make the revision video long, comprehensive, and high-value. Every slide must contain top-tier synthesized revision content.`;
 
   const inputPrompt = `Topic Hint: ${topicName}
 Study Notes content:
@@ -95,6 +75,49 @@ ${textNotes.slice(0, 20000)} // safely sliced to fit prompt`;
     config: {
       systemInstruction: systemPrompt,
       responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          topic: {
+            type: Type.STRING,
+            description: "Summarized beautiful, highly attractive main topic name."
+          },
+          slides: {
+            type: Type.ARRAY,
+            description: "List of exactly 7 to 10 study revision slides summarizing key concepts.",
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                title: {
+                  type: Type.STRING,
+                  description: "Clear, highly attractive slide title for this card."
+                },
+                bullets: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.STRING
+                  },
+                  description: "2 to 3 high-yield summary bullet points highlighting important terms with markdown **bold** tags."
+                },
+                narration: {
+                  type: Type.STRING,
+                  description: "Deep, lively, energetic audio narration script (approx 45-65 words, 4-6 sentences) explaining the concept comprehensively, contextualizing the bullets in detail."
+                },
+                image_prompt: {
+                  type: Type.STRING,
+                  description: "A highly specific, topic-relevant visual image prompt describing the concrete educational concept or metaphor of this slide. Must directly correspond to the actual subject matter of the uploaded PDF (e.g., if biology, describe exact organs/cells; if physics, describe physics phenomena like prisms; if history, describe appropriate historical settings/figures). Do not use broad words like infographic, chart, diagram, text, labels, numbers, words, letters. Describe a high-texture, professional, immersive, and educational visual scene."
+                },
+                duration: {
+                  type: Type.INTEGER,
+                  description: "Slide duration in seconds (must be 15 or 20)."
+                }
+              },
+              required: ["title", "bullets", "narration", "image_prompt", "duration"]
+            }
+          }
+        },
+        required: ["topic", "slides"]
+      },
       temperature: 0.7,
     },
   });
@@ -113,10 +136,11 @@ ${textNotes.slice(0, 20000)} // safely sliced to fit prompt`;
 }
 
 // Generate single educational image using Pollinations AI
-async function generateSlideImage(prompt: string): Promise<string> {
+async function generateSlideImage(prompt: any): Promise<string> {
   // Return the direct CDN URL of Pollinations AI for the client-side browser to fetch.
   // This bypasses server-to-server rate lines and shared cloud IP blocks completely.
-  const cleanPrompt = prompt.replace(/[^\w\s,\-\.]/g, "") + ", cinematic CGI concept art, atmospheric professional visual lighting, stunning photography, masterclass studio design style, highly detailed 3D render, 16:9 aspect ratio, strictly no text, no letters, no labels, no words, no user interfaces";
+  const safePrompt = typeof prompt === "string" ? prompt : "educational study layout abstract concept";
+  const cleanPrompt = safePrompt.replace(/[^\w\s,\-\.]/g, "") + ", cinematic CGI concept art, atmospheric professional visual lighting, stunning photography, masterclass studio design style, highly detailed 3D render, 16:9 aspect ratio, strictly no text, no letters, no labels, no words, no user interfaces";
   const seed = Math.floor(Math.random() * 1000000);
   return `https://image.pollinations.ai/p/${encodeURIComponent(cleanPrompt)}?width=1280&height=720&nologo=true&seed=${seed}`;
 }
@@ -201,6 +225,27 @@ app.post("/api/generate", upload.single("pdfFile"), async (req, res) => {
       error: error.message || "An unexpected error occurred during the revision reel generation process."
     });
   }
+});
+
+// Global Express & Multer error-handling middleware
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error("Global Express Error Handler caught:", err);
+  if (err instanceof multer.MulterError) {
+    if (err.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({
+        success: false,
+        error: "Uploaded file is too large! Maximum limit is 15MB."
+      });
+    }
+    return res.status(400).json({
+      success: false,
+      error: `File upload error: ${err.message}`
+    });
+  }
+  return res.status(500).json({
+    success: false,
+    error: err.message || "Internal server error occurred."
+  });
 });
 
 // Serve frontend and handle bundler environments

@@ -2,8 +2,9 @@ import React, { useState, useEffect } from "react";
 import UploadForm from "./components/UploadForm";
 import ProgressBar from "./components/ProgressBar";
 import ReelPlayer from "./components/ReelPlayer";
-import { Slide, GenerationResponse } from "./types";
-import { Sparkles, Brain, GraduationCap, AlertCircle, RefreshCw, Layers } from "lucide-react";
+import Onboarding from "./components/Onboarding";
+import { Slide, UserProfile } from "./types";
+import { Sparkles, Brain, GraduationCap, AlertCircle, RefreshCw, User, LogOut, Check, Layers, ArrowLeft } from "lucide-react";
 
 export default function App() {
   const [activeView, setActiveView] = useState<"upload" | "generating" | "player">("upload");
@@ -11,6 +12,16 @@ export default function App() {
   const [topic, setTopic] = useState("");
   const [slides, setSlides] = useState<Slide[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  // Student profile state persistence
+  const [profile, setProfile] = useState<UserProfile | null>(() => {
+    try {
+      const saved = localStorage.getItem("revize_profile");
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
 
   // Progressive simulation of generations phases
   useEffect(() => {
@@ -89,6 +100,27 @@ export default function App() {
     setError(null);
   };
 
+  const handleOnboardingComplete = (newProfile: UserProfile) => {
+    setProfile(newProfile);
+    localStorage.setItem("revize_profile", JSON.stringify(newProfile));
+  };
+
+  const handleModifyProfile = () => {
+    // Reset onboarding state in order to select options or choose another board
+    if (profile) {
+      const resetOnboard = { ...profile, onboarded: false };
+      setProfile(resetOnboard);
+    } else {
+      setProfile(null);
+    }
+  };
+
+  const handleLogOut = () => {
+    localStorage.removeItem("revize_profile");
+    setProfile(null);
+    handleReset();
+  };
+
   return (
     <div className="min-h-screen bg-[#070a13] text-slate-100 flex flex-col relative overflow-x-hidden font-sans">
       
@@ -111,18 +143,42 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <span className="hidden sm:inline-flex items-center gap-1.5 text-xs font-mono text-slate-400 bg-slate-900/60 px-3 py-1.5 rounded-lg border border-white/5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              GEMINI ACTIVE
-            </span>
+          <div className="flex items-center gap-2.5">
+            {profile && profile.onboarded && (
+              <div className="flex items-center gap-2 bg-slate-900/80 border border-white/5 px-3 py-1.5 rounded-xl text-xs" id="header-student-badge">
+                <div className="w-2.5 h-2.5 rounded-full bg-yellow-400 animate-pulse shrink-0" />
+                <div className="text-left leading-none font-mono">
+                  <span className="text-slate-300 text-[10px] font-bold block truncate max-w-[120px]">
+                    {profile.name} {profile.isGuest ? "(Guest)" : ""}
+                  </span>
+                  <span className="text-blue-400 text-[8px] font-extrabold tracking-tight uppercase">
+                    Grade {profile.standard} • {profile.board}
+                  </span>
+                </div>
+                <button
+                  onClick={handleModifyProfile}
+                  title="Switch Academic Cohort/Standard"
+                  className="ml-2 px-1.5 py-1 text-[9px] font-mono text-slate-500 hover:text-slate-300 bg-white/5 rounded duration-150"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={handleLogOut}
+                  title="Log Out Student"
+                  className="text-slate-600 hover:text-rose-400 p-0.5 duration-150"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+            
             <a 
               href="https://ai.studio/build" 
               target="_blank" 
               rel="noreferrer"
               className="text-xs text-slate-300 hover:text-white font-mono bg-blue-600/20 border border-blue-500/20 px-3 py-1.5 rounded-lg hover:bg-blue-600/30 transition-all font-semibold"
             >
-              HACKATHON DEMO v1.0
+              HACKATHON DEMO v1.1
             </a>
           </div>
         </div>
@@ -131,58 +187,65 @@ export default function App() {
       {/* Main Container screen elements */}
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 md:px-6 py-10 md:py-16 relative z-10 flex flex-col justify-center">
         
-        {/* Top visual slogan headers */}
-        {activeView === "upload" && (
-          <div className="text-center space-y-4 mb-10 max-w-2xl mx-auto">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-mono font-semibold">
-              <Sparkles className="w-3.5 h-3.5 text-yellow-300 animate-pulse" />
-              Revolutionize How You Study
-            </div>
-            
-            <h1 className="font-display font-black text-3xl md:text-5xl text-white tracking-tight leading-tight">
-              Transform study docs into <span className="bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">AI Revision Reels</span>
-            </h1>
-            
-            <p className="text-slate-400 text-sm md:text-base leading-relaxed font-sans">
-              Upload textbook PDFs, class slides, notes, or syllabus guides. Our neural pipeline condenses the material, designs infographic visual structures, crafts voice narratives, and compiles a short mobile learning reel.
-            </p>
-          </div>
-        )}
-
-        {/* Dynamic Display Error Block */}
-        {error && (
-          <div className="w-full max-w-2xl mx-auto mb-8 bg-rose-500/5 hover:bg-rose-500/10 transition-all border border-rose-500/20 p-5 rounded-2xl flex items-start gap-3.5">
-            <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <span className="font-display font-bold text-sm text-rose-300">Synthesis Pipeline Interrupted</span>
-              <p className="text-xs text-slate-300 leading-normal font-sans">{error}</p>
-              <div className="pt-2">
-                <button
-                  onClick={handleReset}
-                  className="flex items-center gap-1.5 text-xs text-rose-400 font-mono font-semibold underline hover:text-rose-300"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  Try again
-                </button>
+        {/* Render Onboarding Flow if not yet onboarded */}
+        {!profile || !profile.onboarded ? (
+          <Onboarding onComplete={handleOnboardingComplete} />
+        ) : (
+          <>
+            {/* Top visual slogan headers (Only show in Upload View) */}
+            {activeView === "upload" && (
+              <div className="text-center space-y-4 mb-10 max-w-2xl mx-auto">
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-mono font-semibold">
+                  <Sparkles className="w-3.5 h-3.5 text-yellow-300 animate-pulse" />
+                  Grade {profile.standard} {profile.board} Syllabus Adaptive Mode
+                </div>
+                
+                <h1 className="font-display font-black text-3xl md:text-5xl text-white tracking-tight leading-tight">
+                  Transform study docs into <span className="bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">AI Revision Reels</span>
+                </h1>
+                
+                <p className="text-slate-400 text-sm md:text-base leading-relaxed font-sans">
+                  Welcome, <span className="text-white font-bold">{profile.name}</span>. Upload textbook PDFs or paste summaries. Our adaptive Gemini pipeline designs visual whiteboard slides tailored for <span className="text-yellow-400 font-bold">{profile.board} Standard {profile.standard}</span> revisions.
+                </p>
               </div>
+            )}
+
+            {/* Dynamic Display Error Block */}
+            {error && (
+              <div className="w-full max-w-2xl mx-auto mb-8 bg-rose-500/5 hover:bg-rose-500/10 transition-all border border-rose-500/20 p-5 rounded-2xl flex items-start gap-3.5">
+                <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <span className="font-display font-bold text-sm text-rose-300">Synthesis Pipeline Interrupted</span>
+                  <p className="text-xs text-slate-300 leading-normal font-sans">{error}</p>
+                  <div className="pt-2">
+                    <button
+                      onClick={handleReset}
+                      className="flex items-center gap-1.5 text-xs text-rose-400 font-mono font-semibold underline hover:text-rose-300"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      Try again
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Dynamic Sub-Views Rendering router */}
+            <div className="w-full">
+              {activeView === "upload" && (
+                <UploadForm onGenerate={handleGenerate} isLoading={activeView === "generating"} />
+              )}
+
+              {activeView === "generating" && (
+                <ProgressBar currentStage={currentStage} />
+              )}
+
+              {activeView === "player" && (
+                <ReelPlayer topic={topic} slides={slides} onReset={handleReset} />
+              )}
             </div>
-          </div>
+          </>
         )}
-
-        {/* Dynamic Sub-Views Rendering router */}
-        <div className="w-full">
-          {activeView === "upload" && (
-            <UploadForm onGenerate={handleGenerate} isLoading={activeView === "generating"} />
-          )}
-
-          {activeView === "generating" && (
-            <ProgressBar currentStage={currentStage} />
-          )}
-
-          {activeView === "player" && (
-            <ReelPlayer topic={topic} slides={slides} onReset={handleReset} />
-          )}
-        </div>
       </main>
 
       {/* Footer Branding elements */}
